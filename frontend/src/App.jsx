@@ -83,6 +83,19 @@ function App() {
       <header className="header">
         <h1>Parking Detector UI</h1>
         <p>Upload an image and get annotated output from active production model.</p>
+        <div className="project-info">
+          <h3>About This Project</h3>
+          <p><strong>MLOps Parking Detection System</strong></p>
+          <ul>
+            <li><strong>Models:</strong> yolov8 & yolov11 (YOLO object detection)</li>
+            <li><strong>Backend:</strong> BentoML with Python</li>
+            <li><strong>Frontend:</strong> React with Vite</li>
+            <li><strong>Monitoring:</strong> Prometheus + Grafana</li>
+            <li><strong>Deployment:</strong> Docker + GitHub Actions</li>
+            <li><strong>Data Versioning:</strong> DVC with S3 storage</li>
+          </ul>
+          <p><strong>Current Model:</strong> {serviceStatus.active_model_version}</p>
+        </div>
         <div className="service-status">
           <span className={`status-indicator ${serviceStatus.model_loaded === 'True' ? 'ready' : 'not-ready'}`}></span>
           <span>Model: {serviceStatus.active_model_version}</span>
