@@ -12,7 +12,7 @@ from PIL import Image
 from ultralytics import YOLO
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
-from .model_loader import ensure_model_exists, get_active_model_version
+from .model_loader import ensure_model_exists, get_active_model_name
 
 # Prometheus metrics
 REQUEST_COUNT = Counter('parking_detector_requests_total', 'Total requests', ['method', 'endpoint'])
@@ -32,35 +32,42 @@ def _load_yolo(version: str) -> YOLO:
         raise
 
 
-@bentoml.service(name="parking-detector-service")
+@bentoml.service(name="parking-detector-service", traffic={"timeout": 60})
 class ParkingDetectorService:
     def __init__(self):
         self.model_version = None
         self.model_loaded = False
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+        logging.info("Starting service initialization...")
         try:
-            self.model_version = get_active_model_version()
-            _load_yolo(self.model_version)
+            self.model_version = get_active_model_name()
+            logging.info(f"Active model from config: {self.model_version}")
+            logging.info(f"Loading model: {self.model_version}")
+            model = _load_yolo(self.model_version)
             self.model_loaded = True
-            logging.info(f"Service initialized with model: {self.model_version}")
+            logging.info(f"Service successfully initialized with model: {self.model_version}")
         except Exception as e:
-            logging.error(f"Service initialization failed: {str(e)}")
+            self.model_loaded = False
+            logging.error(f"Service initialization failed: {str(e)}", exc_info=True)
+            logging.error(f"Model version attempted: {self.model_version}")
+            # Don't raise exception, allow service to start with model_loaded=False
     
     @bentoml.api
-    def health(self) -> dict[str, str]:
-        REQUEST_COUNT.labels(method='GET', endpoint='/health').inc()
+    def health(self, dummy: str = "") -> dict[str, str]:
+        REQUEST_COUNT.labels(method='POST', endpoint='/health').inc()
         return {
             "status": "ok", 
             "active_model_version": self.model_version or "unknown",
-            "model_loaded": self.model_loaded
+            "model_loaded": str(self.model_loaded)
         }
     
     @bentoml.api
-    def ready(self) -> dict[str, str]:
-        REQUEST_COUNT.labels(method='GET', endpoint='/ready').inc()
+    def ready(self, dummy: str = "") -> dict[str, str]:
+        REQUEST_COUNT.labels(method='POST', endpoint='/ready').inc()
         return {
             "status": "ready" if self.model_loaded else "not_ready",
             "model_version": self.model_version or "unknown",
-            "model_loaded": self.model_loaded
+            "model_loaded": str(self.model_loaded)
         }
     
     

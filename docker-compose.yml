@@ -23,6 +23,7 @@ services:
       - /app/node_modules
     environment:
       - NODE_ENV=development
+      - BACKEND_URL=http://app:3000
     restart: unless-stopped
     networks:
       - monitoring

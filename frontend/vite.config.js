@@ -9,11 +9,11 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/predict': {
-        target: 'http://localhost:3000',
+        target: process.env.BACKEND_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
       '/health': {
-        target: 'http://localhost:3000',
+        target: process.env.BACKEND_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
     },

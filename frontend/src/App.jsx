@@ -7,7 +7,7 @@ function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [serviceStatus, setServiceStatus] = useState({ status: 'unknown', model_version: 'unknown', model_loaded: false })
+  const [serviceStatus, setServiceStatus] = useState({ status: 'unknown', active_model_version: 'unknown', model_loaded: 'False' })
 
   const annotatedImageUrl = useMemo(() => {
     if (!result?.annotated_image_base64) return ''
@@ -17,7 +17,7 @@ function App() {
   useEffect(() => {
     const fetchServiceStatus = async () => {
       try {
-        const response = await fetch('/health')
+        const response = await fetch('/health', { method: 'POST', body: JSON.stringify({dummy: ""}), headers: {'Content-Type': 'application/json'} })
         if (response.ok) {
           const data = await response.json()
           setServiceStatus(data)
@@ -84,8 +84,8 @@ function App() {
         <h1>Parking Detector UI</h1>
         <p>Upload an image and get annotated output from active production model.</p>
         <div className="service-status">
-          <span className={`status-indicator ${serviceStatus.model_loaded ? 'ready' : 'not-ready'}`}></span>
-          <span>Model: {serviceStatus.model_version}</span>
+          <span className={`status-indicator ${serviceStatus.model_loaded === 'True' ? 'ready' : 'not-ready'}`}></span>
+          <span>Model: {serviceStatus.active_model_version}</span>
           <span>Status: {serviceStatus.status}</span>
         </div>
       </header>
@@ -102,8 +102,8 @@ function App() {
             />
           </div>
 
-          <button type="submit" disabled={loading || !serviceStatus.model_loaded}>
-            {loading ? 'Running Inference...' : !serviceStatus.model_loaded ? 'Model Not Ready' : 'Run Detection'}
+          <button type="submit" disabled={loading || serviceStatus.model_loaded !== 'True'}>
+            {loading ? 'Running Inference...' : serviceStatus.model_loaded !== 'True' ? 'Model Not Ready' : 'Run Detection'}
           </button>
         </form>
 
