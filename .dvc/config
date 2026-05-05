@@ -1,0 +1,5 @@
+[core]
+    remote = modelstore
+['remote "modelstore"']
+    url = s3://mlops-project-tejas-648377378359/mlops-project/models
+    region = ap-south-1
