@@ -28,6 +28,8 @@ jobs:
             cd "${{ secrets.EC2_DEPLOY_PATH }}"
             git pull
             docker-compose down
+            # Remove certbot image to save disk space
+            docker rmi certbot/certbot:latest
             # Clean up Docker images to save disk space
             docker image prune -a -f
             docker-compose up -d
