@@ -30,8 +30,4 @@ jobs:
             git reset --hard origin/main
             dvc pull
             docker compose down
-            # Remove problematic certbot directories that cause permission issues
-            sudo rm -rf certbot/conf/accounts certbot/conf/renewal certbot/conf/live/.gitignore || true
-            # Fix permission issues before building
-            sudo chown -R $USER:$USER . || true
             docker compose up -d --build
