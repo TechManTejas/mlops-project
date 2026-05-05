@@ -1,0 +1,10 @@
+services:
+  parking-detector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mlops-parking-detector:latest
+    container_name: mlops-parking-detector
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
