@@ -30,3 +30,5 @@ jobs:
             git pull
             docker-compose down
             docker-compose up -d --build
+            # Clean up unused Docker images to save space
+            docker image prune -f
