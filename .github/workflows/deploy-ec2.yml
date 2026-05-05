@@ -28,4 +28,6 @@ jobs:
             cd "${{ secrets.EC2_DEPLOY_PATH }}"
             git pull
             docker-compose down
+            # Clean up Docker images to save disk space
+            docker image prune -a -f
             docker-compose up -d
