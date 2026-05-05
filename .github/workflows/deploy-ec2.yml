@@ -29,6 +29,11 @@ jobs:
             git fetch --all
             git pull
             docker-compose down
-            docker-compose up -d --build
+            # Only rebuild if Dockerfile or requirements changed
+            if git diff --name-only HEAD~1 HEAD | grep -E "(Dockerfile|requirements|docker-compose\.yml)"; then
+              docker-compose up -d --build
+            else
+              docker-compose up -d
+            fi
             # Clean up unused Docker images to save space
             docker image prune -f
