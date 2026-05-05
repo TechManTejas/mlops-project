@@ -9,6 +9,7 @@ on:
       - "src/**"
       - "Dockerfile"
       - "requirements.txt"
+      - "requirements-cpu.txt"
       - "docker-compose.yml"
 
 jobs:
