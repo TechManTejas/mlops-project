@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: mlops
+  labels:
+    app: parking-detector
+    component: grafana
+spec:
+  selector:
+    app: parking-detector
+    component: grafana
+  ports:
+  - name: http
+    port: 3000
+    targetPort: 3000
+    protocol: TCP
+  type: ClusterIP

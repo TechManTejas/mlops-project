@@ -1,22 +1,23 @@
 from pathlib import Path
+import logging
 
 import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MODELS_ROOT = PROJECT_ROOT / "models" / "parking"
-SERVING_CONFIG_PATH = PROJECT_ROOT / "config" / "serving.yaml"
-SUPPORTED_VERSIONS = {"v1", "v2"}
+MODEL_CONFIG_PATH = PROJECT_ROOT / "config" / "model_config.yaml"
+SUPPORTED_MODELS = {"yolov8", "yolov11"}
 
 
-def get_model_path(version: str) -> Path:
-    if version not in SUPPORTED_VERSIONS:
-        raise ValueError(f"Unsupported version '{version}'. Use one of: {sorted(SUPPORTED_VERSIONS)}")
-    return MODELS_ROOT / version / "model.onnx"
+def get_model_path(model_name: str) -> Path:
+    if model_name not in SUPPORTED_MODELS:
+        raise ValueError(f"Unsupported model '{model_name}'. Use one of: {sorted(SUPPORTED_MODELS)}")
+    return MODELS_ROOT / model_name / "model.pt"
 
 
-def ensure_model_exists(version: str) -> Path:
-    model_path = get_model_path(version)
+def ensure_model_exists(model_name: str) -> Path:
+    model_path = get_model_path(model_name)
     if not model_path.exists():
         raise FileNotFoundError(
             f"Model not found at {model_path}. Run `dvc pull` before starting the service."
@@ -24,18 +25,20 @@ def ensure_model_exists(version: str) -> Path:
     return model_path
 
 
-def get_active_model_version() -> str:
-    if not SERVING_CONFIG_PATH.exists():
-        raise FileNotFoundError(f"Missing serving config: {SERVING_CONFIG_PATH}")
+def get_active_model_name() -> str:
+    if not MODEL_CONFIG_PATH.exists():
+        raise FileNotFoundError(f"Missing model config: {MODEL_CONFIG_PATH}")
 
-    with SERVING_CONFIG_PATH.open("r", encoding="utf-8") as file:
+    with MODEL_CONFIG_PATH.open("r", encoding="utf-8") as file:
         data = yaml.safe_load(file) or {}
 
-    version = data.get("active_model_version")
-    if version not in SUPPORTED_VERSIONS:
+    model_name = data.get("model", {}).get("name")
+    if model_name not in SUPPORTED_MODELS:
         raise ValueError(
-            f"Invalid active_model_version '{version}' in {SERVING_CONFIG_PATH}. "
-            f"Use one of: {sorted(SUPPORTED_VERSIONS)}"
+            f"Invalid model name '{model_name}' in {MODEL_CONFIG_PATH}. "
+            f"Use one of: {sorted(SUPPORTED_MODELS)}"
         )
-    return version
+    
+    logging.info(f"Loading model: {model_name}")
+    return model_name
 

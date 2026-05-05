@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parking-detector-app
+  namespace: mlops
+  labels:
+    app: parking-detector
+    component: app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: parking-detector
+      component: app
+  template:
+    metadata:
+      labels:
+        app: parking-detector
+        component: app
+    spec:
+      containers:
+      - name: app
+        image: mlops-parking-detector:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        volumeMounts:
+        - name: model-config
+          mountPath: /app/config/model_config.yaml
+          subPath: model_config.yaml
+      volumes:
+      - name: model-config
+        configMap:
+          name: model-config

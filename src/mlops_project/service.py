@@ -1,59 +1,118 @@
 from __future__ import annotations
 
 import base64
+import logging
+import time
 from functools import lru_cache
 from io import BytesIO
 
 import bentoml
 import numpy as np
-import onnxruntime as ort
 from PIL import Image
 from ultralytics import YOLO
+from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
 from .model_loader import ensure_model_exists, get_active_model_version
 
-
-@lru_cache(maxsize=2)
-def _load_session(version: str) -> ort.InferenceSession:
-    model_path = ensure_model_exists(version)
-    return ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+# Prometheus metrics
+REQUEST_COUNT = Counter('parking_detector_requests_total', 'Total requests', ['method', 'endpoint'])
+REQUEST_LATENCY = Histogram('parking_detector_request_duration_seconds', 'Request latency')
+PREDICTION_COUNT = Counter('parking_detector_predictions_total', 'Total predictions', ['model_version'])
 
 
 @lru_cache(maxsize=2)
 def _load_yolo(version: str) -> YOLO:
-    model_path = ensure_model_exists(version)
-    return YOLO(str(model_path), task="detect")
+    try:
+        model_path = ensure_model_exists(version)
+        model = YOLO(str(model_path), task="detect")
+        logging.info(f"Successfully loaded model: {version}")
+        return model
+    except Exception as e:
+        logging.error(f"Failed to load model {version}: {str(e)}")
+        raise
 
 
 @bentoml.service(name="parking-detector-service")
 class ParkingDetectorService:
+    def __init__(self):
+        self.model_version = None
+        self.model_loaded = False
+        try:
+            self.model_version = get_active_model_version()
+            _load_yolo(self.model_version)
+            self.model_loaded = True
+            logging.info(f"Service initialized with model: {self.model_version}")
+        except Exception as e:
+            logging.error(f"Service initialization failed: {str(e)}")
+    
     @bentoml.api
     def health(self) -> dict[str, str]:
-        return {"status": "ok", "active_model_version": get_active_model_version()}
-
+        REQUEST_COUNT.labels(method='GET', endpoint='/health').inc()
+        return {
+            "status": "ok", 
+            "active_model_version": self.model_version or "unknown",
+            "model_loaded": self.model_loaded
+        }
+    
+    @bentoml.api
+    def ready(self) -> dict[str, str]:
+        REQUEST_COUNT.labels(method='GET', endpoint='/ready').inc()
+        return {
+            "status": "ready" if self.model_loaded else "not_ready",
+            "model_version": self.model_version or "unknown",
+            "model_loaded": self.model_loaded
+        }
+    
+    
     @bentoml.api
     def predict(self, image: Image.Image) -> dict:
-        version = get_active_model_version()
-        # Keep ONNXRuntime metadata check and use YOLO runtime for bbox output.
-        session = _load_session(version)
-        model = _load_yolo(version)
-        input_names = [item.name for item in session.get_inputs()]
-        output_names = [item.name for item in session.get_outputs()]
-        image_array = np.array(image)
-        result = model(image_array)[0]
-        plotted = result.plot()
-        plotted_image = Image.fromarray(plotted)
-        image_buffer = BytesIO()
-        plotted_image.save(image_buffer, format="JPEG")
-        annotated_image_base64 = base64.b64encode(image_buffer.getvalue()).decode("utf-8")
+        start_time = time.time()
+        REQUEST_COUNT.labels(method='POST', endpoint='/predict').inc()
+        
+        if not self.model_loaded:
+            error_msg = "Model not loaded - service not ready"
+            logging.error(error_msg)
+            return {
+                "status": "error",
+                "error": error_msg,
+                "model_version": self.model_version or "unknown",
+                "inference_time": 0.0
+            }
+        
+        try:
+            model = _load_yolo(self.model_version)
+            image_array = np.array(image)
+            result = model(image_array)[0]
+            plotted = result.plot()
+            plotted_image = Image.fromarray(plotted)
+            image_buffer = BytesIO()
+            plotted_image.save(image_buffer, format="JPEG")
+            annotated_image_base64 = base64.b64encode(image_buffer.getvalue()).decode("utf-8")
 
-        return {
-            "model_version": version,
-            "image_shape": list(image_array.shape),
-            "input_names": input_names,
-            "output_names": output_names,
-            "detections": int(len(result.boxes)),
-            "annotated_image_base64": annotated_image_base64,
-            "message": f"Output generated with model version {version}.",
-        }
+            inference_time = time.time() - start_time
+            PREDICTION_COUNT.labels(model_version=self.model_version).inc()
+            REQUEST_LATENCY.observe(inference_time)
+            
+            logging.info(f"Prediction completed - Model: {self.model_version}, Detections: {len(result.boxes)}, Time: {inference_time:.3f}s")
 
+            return {
+                "status": "success",
+                "model_version": self.model_version,
+                "inference_time": round(inference_time, 3),
+                "image_shape": list(image_array.shape),
+                "detections": int(len(result.boxes)),
+                "annotated_image_base64": annotated_image_base64,
+                "message": f"Prediction completed with {len(result.boxes)} detections using model {self.model_version}.",
+            }
+        except Exception as e:
+            inference_time = time.time() - start_time
+            error_msg = f"Prediction failed: {str(e)}"
+            logging.error(f"Prediction failed - Model: {self.model_version}, Error: {str(e)}, Time: {inference_time:.3f}s")
+            return {
+                "status": "error",
+                "error": error_msg,
+                "model_version": self.model_version,
+                "inference_time": round(inference_time, 3)
+            }
+
+    

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
@@ -7,11 +7,30 @@ function App() {
   const [result, setResult] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [serviceStatus, setServiceStatus] = useState({ status: 'unknown', model_version: 'unknown', model_loaded: false })
 
   const annotatedImageUrl = useMemo(() => {
     if (!result?.annotated_image_base64) return ''
     return `data:image/jpeg;base64,${result.annotated_image_base64}`
   }, [result])
+
+  useEffect(() => {
+    const fetchServiceStatus = async () => {
+      try {
+        const response = await fetch('/health')
+        if (response.ok) {
+          const data = await response.json()
+          setServiceStatus(data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch service status:', err)
+      }
+    }
+
+    fetchServiceStatus()
+    const interval = setInterval(fetchServiceStatus, 10000) // Poll every 10 seconds
+    return () => clearInterval(interval)
+  }, [])
 
   const onFileChange = (event) => {
     const file = event.target.files?.[0]
@@ -63,7 +82,12 @@ function App() {
     <main className="page">
       <header className="header">
         <h1>Parking Detector UI</h1>
-        <p>Upload an image and get annotated output from the active production model.</p>
+        <p>Upload an image and get annotated output from active production model.</p>
+        <div className="service-status">
+          <span className={`status-indicator ${serviceStatus.model_loaded ? 'ready' : 'not-ready'}`}></span>
+          <span>Model: {serviceStatus.model_version}</span>
+          <span>Status: {serviceStatus.status}</span>
+        </div>
       </header>
 
       <section className="card form-card">
@@ -78,8 +102,8 @@ function App() {
             />
           </div>
 
-          <button type="submit" disabled={loading}>
-            {loading ? 'Running Inference...' : 'Run Detection'}
+          <button type="submit" disabled={loading || !serviceStatus.model_loaded}>
+            {loading ? 'Running Inference...' : !serviceStatus.model_loaded ? 'Model Not Ready' : 'Run Detection'}
           </button>
         </form>
 
@@ -109,9 +133,10 @@ function App() {
           </div>
           {result && (
             <div className="meta">
-              <span>Version: {result.model_version}</span>
+              <span>Model: {result.model_version}</span>
+              <span>Time: {result.inference_time}s</span>
               <span>Detections: {result.detections}</span>
-              <span>{result.message}</span>
+              <span className={`status ${result.status}`}>{result.status}</span>
             </div>
           )}
         </div>
