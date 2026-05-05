@@ -1,0 +1,5 @@
+bentoml
+dvc[s3]
+numpy
+onnxruntime
+pillow

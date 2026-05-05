@@ -1,0 +1,16 @@
+service: "src/mlops_project/service.py:ParkingDetectorService"
+description: "Parking detector API with model version selection via DVC-managed ONNX files."
+labels:
+  project: "mlops-project"
+  stage: "dev"
+include:
+  - "src/**"
+  - "models/parking/v1/model.onnx.dvc"
+  - "models/parking/v2/model.onnx.dvc"
+  - "scripts/pull_models.ps1"
+python:
+  packages:
+    - bentoml
+    - onnxruntime
+    - numpy
+    - pillow
