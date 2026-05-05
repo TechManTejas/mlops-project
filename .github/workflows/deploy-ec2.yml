@@ -30,4 +30,6 @@ jobs:
             git reset --hard origin/main
             dvc pull
             docker compose down
+            # Fix permission issues before building
+            sudo chown -R $USER:$USER . || true
             docker compose up -d --build
